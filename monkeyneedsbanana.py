@@ -29,11 +29,13 @@ class Bot:
     async def alarm(self, context: ContextTypes.DEFAULT_TYPE) -> None:
         job = context.job
         log_out_minutes = self.log_out_time - (job.data / 60)
+        self.timer[job.chat_id].alert = None
         await context.bot.send_message(job.chat_id, text=f"Ey! You have {log_out_minutes} minutes untill I die\nGive me bananas please")
 
 
     async def timeout(self, context: ContextTypes.DEFAULT_TYPE) -> None:
         job = context.job
+        self.timer[job.chat_id].dead= None
         await context.bot.send_message(job.chat_id, text=f"Your monkey has died, be carefull next time\n#monkeylifematters")
 
 
@@ -43,17 +45,15 @@ class Bot:
         if not chat_id:
             return
         if chat_id in self.timer:
-            self.timer[chat_id].alert.schedule_removal()
-            self.timer[chat_id].dead.schedule_removal()
-
+            await self.stop(update, context)
+        self.timer[chat_id] = DataTimer()
         if context.args and context.args[0].isnumeric() and float(context.args[0]) > 0:
             self.timer[chat_id].timer = float(context.args[0])
 #        try:
 #            self.timer[chat_id].timer = float(context.args[0]) * 60
-#        except (IndexError, ValueError)
+#        except (IndexError, ValueError):
 #            self.timer[chat_id].timer = 35 * 60
         first_name = update.effective_user.first_name
-        self.timer[chat_id] = DataTimer()
         self.timer[chat_id].time_init = time.monotonic()
         timer_clock = self.timer[chat_id].time_init - self.timer[chat_id].time_init
         self.timer[chat_id].dead = context.job_queue.run_once(self.timeout, self.log_out_time, chat_id=chat_id, name=str(chat_id))
@@ -74,11 +74,13 @@ class Bot:
         chat_id = update.effective_message.chat_id
         #if self.timer[chat_id].alert and self.timer[chat_id].dead:
         try:
-            self.timer[chat_id].alert.schedule_removal()
-            self.timer[chat_id].dead.schedule_removal()
-            self.timer.pop(chat_id)
-        except (IndexError, ValueError):
-            await update.message.reply_text("ERROR\nSorry, you have nothing to stop")
+#            if self.timer[chat_id].alert:
+                self.timer[chat_id].alert.schedule_removal()
+#            if self.timer[chat_id].dead:
+                self.timer[chat_id].dead.schedule_removal()
+                self.timer.pop(chat_id)
+        except (IndexError, AttributeError, KeyError):
+            await update.effective_message.reply_text("ERROR\nSorry, you have nothing to stop")
 
     async def stop_all(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: 
         self.timer = {}
