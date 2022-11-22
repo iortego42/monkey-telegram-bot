@@ -5,24 +5,83 @@ from os import getenv
 from dotenv import load_dotenv, dotenv_values
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackContext
 
+from wherearethemonkeys import Locator
+import sqlite3
+
+
+conn = sqlite3.connect('wherearethemonkeys.db')
+
+cur = conn.cursor()
+
+cur.execute("""CREATE TABLE IF NOT EXISTS users(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id INT UNIQUE
+                                              )""")
+
+
+cur.execute("""
+    CREATE TABLE IF NOT EXISTS friends(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        owner_id INT NOT NULL,
+        login TEXT NOT NULL
+        )
+          """)
+conn.commit()
+#cur.execute("INSERT INTO users(chat_id) VALUES(?)", (int(121)))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class Location:
+    def __init__(self):
+        self.cursor = conn.cursor()
+        self.logins = {}
+		self.locator = Locator()
 class DataTimer:
     def __init__(self):
-        self.timer = 35 #* 60
+        self.timer = 35 * 60
         self.time_init = time.monotonic()
         self.dead = None
         self.alert = None
 
 class Bot:
     def __init__(self):
-        self.log_out_time = 42 #* 60
+        self.location = Location()
+        self.log_out_time = 42 * 60
         self.timer = {}
         self.messages = dotenv_values("messages_templates.txt")
 #        self.locations = {}
 #    def delete_monkey()
-#    def list_monkeys()
+#
+    async def list_monkeys(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        chat_id = update.effective_message.chat_id
+
+        id = self.location.cursor.execute(f"SELECT id from users WHERE chat_id='{chat_id}'")
+        if id.fetchoneone():
+            users = self.location.cursor.execute(f"SELECT login FROM friends WHERE owner_id='{id}'")
+        else:
+            await context.bot.effective_message(chat_id, text="ERROR, empty monkey list")
+            return
+        for user in users:
+            list += user + ','
+		
+		
+
 #    def wherearethemonkeys()
 #    def add_monkey() -> None:
-#        if chat_id not in self.location:
+#        if chat_id not in self.locatio
 #            self.location[chat_id] = []
 #        self.location[chat_id].append()
 
@@ -35,7 +94,7 @@ class Bot:
 
     async def timeout(self, context: ContextTypes.DEFAULT_TYPE) -> None:
         job = context.job
-        self.timer[job.chat_id].dead= None
+        self.timer[job.chat_id].dead = None
         await context.bot.send_message(job.chat_id, text=f"Your monkey has died, be carefull next time\n#monkeylifematters")
 
 
@@ -49,10 +108,6 @@ class Bot:
         self.timer[chat_id] = DataTimer()
         if context.args and context.args[0].isnumeric() and float(context.args[0]) > 0:
             self.timer[chat_id].timer = float(context.args[0])
-#        try:
-#            self.timer[chat_id].timer = float(context.args[0]) * 60
-#        except (IndexError, ValueError):
-#            self.timer[chat_id].timer = 35 * 60
         first_name = update.effective_user.first_name
         self.timer[chat_id].time_init = time.monotonic()
         timer_clock = self.timer[chat_id].time_init - self.timer[chat_id].time_init
@@ -74,11 +129,11 @@ class Bot:
         chat_id = update.effective_message.chat_id
         #if self.timer[chat_id].alert and self.timer[chat_id].dead:
         try:
-#            if self.timer[chat_id].alert:
+            if self.timer[chat_id].alert:
                 self.timer[chat_id].alert.schedule_removal()
-#            if self.timer[chat_id].dead:
+            if self.timer[chat_id].dead:
                 self.timer[chat_id].dead.schedule_removal()
-                self.timer.pop(chat_id)
+            self.timer.pop(chat_id)
         except (IndexError, AttributeError, KeyError):
             await update.effective_message.reply_text("ERROR\nSorry, you have nothing to stop")
 
@@ -105,3 +160,5 @@ app.add_handler(CommandHandler(["stop", "o"], bot.stop))
 app.add_handler(CommandHandler("kill", bot.stop_all))
 
 app.run_polling()
+
+conn.close()
