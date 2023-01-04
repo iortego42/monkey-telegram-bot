@@ -1,4 +1,5 @@
-START=Ey! You have {log_out_minutes} minutes untill I die\nGive me bananas please
-TIMER=Hello {first_name}, you\'ve started the script.\nTimer: {timer_clock}
-ERROR_NO_MONKEY=ERROR you dont have a monkey, please execute /start
-MONKEY_DIED=Your monkey has died, be carefull next time\n#monkeylifematters
+START="Ey! You have {log_out_minutes} minutes untill I die\nGive me bananas please"
+TIMER="Hello {first_name}, you\'ve started the script.\nTimer: {timer_clock}"
+ERROR_NO_MONKEY="ERROR you dont have a monkey, please execute /start"
+MONKEY_DIED="Your monkey has died, be carefull next time\n#monkeylifematters"
+HELP_PANEL="Available Comands:\n    /w wherearethemonkeys\n/"

@@ -4,8 +4,7 @@ from telegram import Update
 from os import getenv
 from dotenv import load_dotenv, dotenv_values
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackContext
-
-from wherearethemonkeys import Locator
+from wherearethemonkeys.wherearethemonkeys import Locator
 import sqlite3
 
 
@@ -15,14 +14,14 @@ cur = conn.cursor()
 
 cur.execute("""CREATE TABLE IF NOT EXISTS users(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    chat_id INT UNIQUE
+    chat_id INTEGER UNIQUE
                                               )""")
 
 
 cur.execute("""
     CREATE TABLE IF NOT EXISTS friends(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        owner_id INT NOT NULL,
+        owner_id INTEGER NOT NULL,
         login TEXT NOT NULL
         )
           """)
@@ -37,18 +36,19 @@ conn.commit()
 
 
 
-
-
-
-
-
-
+def give_format(list: dict) -> str:
+    location = "Here are your friends:\n"
+    for user in list:
+        if list[user]:
+            location += f"""• {user} -> {list[user]}\n"""
+    return location
 
 class Location:
     def __init__(self):
         self.cursor = conn.cursor()
         self.logins = {}
-		self.locator = Locator()
+        self.locator = Locator()
+
 class DataTimer:
     def __init__(self):
         self.timer = 35 * 60
@@ -62,28 +62,84 @@ class Bot:
         self.log_out_time = 42 * 60
         self.timer = {}
         self.messages = dotenv_values("messages_templates.txt")
-#        self.locations = {}
-#    def delete_monkey()
-#
-    async def list_monkeys(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+
+
+
+    async def help_panel(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        await update.effective_message.reply_text(self.messages["HELP_PANEL"])
+
+
+    def list(self, chat_id):
+        self.location.cursor.execute("SELECT id FROM users WHERE chat_id=?", (chat_id,))
+        id = self.location.cursor.fetchone()
+        users = ""
+        if id and id[0]:
+            self.location.cursor.execute("SELECT login FROM friends WHERE owner_id=?", (id[0],))
+            userslist = self.location.cursor.fetchall()
+            for user in userslist:
+                users += user[0] + ','
+        return users
+
+    async def list_show(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         chat_id = update.effective_message.chat_id
-
-        id = self.location.cursor.execute(f"SELECT id from users WHERE chat_id='{chat_id}'")
-        if id.fetchoneone():
-            users = self.location.cursor.execute(f"SELECT login FROM friends WHERE owner_id='{id}'")
-        else:
-            await context.bot.effective_message(chat_id, text="ERROR, empty monkey list")
+        list = self.list(chat_id).split(',')
+        userlist = ""
+        for element in list[:-1]:
+            userlist += "• " + element + '\n'
+        if userlist == "":
+            await update.effective_message.reply_text("ERROR No friends list")
             return
-        for user in users:
-            list += user + ','
-		
-		
+        await update.effective_message.reply_text(f"""Your friends list:\n{userlist}""")
 
-#    def wherearethemonkeys()
-#    def add_monkey() -> None:
-#        if chat_id not in self.locatio
-#            self.location[chat_id] = []
-#        self.location[chat_id].append()
+
+    async def wherearethemonkeys(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        chat_id = update.effective_message.chat_id
+        users = self.list(chat_id)
+        if not users:
+            await update.effective_message.reply_text("ERROR No friends list")
+            return
+        self.location.locator.set_payload(users_input=users)
+        locations = self.location.locator.dict_list()
+        await update.effective_message.reply_text(give_format(locations))
+
+
+    async def add_monkey(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        chat_id = update.effective_message.chat_id
+        self.location.cursor.execute("SELECT id FROM users WHERE chat_id=?", (chat_id,))
+        id = self.location.cursor.fetchone()
+        if not id or not id[0]:
+            self.location.cursor.execute("INSERT INTO users(chat_id) VALUES(?)", (chat_id,))
+            conn.commit()
+            self.location.cursor.execute("SELECT id FROM users WHERE chat_id=?", (chat_id,))
+            id = self.location.cursor.fetchone()
+        if context.args:
+            for userlogin in context.args:
+                self.location.cursor.executemany("INSERT INTO friends(login, owner_id) VALUES(?, ?)", [(userlogin, id[0])])
+            conn.commit()
+            await update.effective_message.reply_text("Users added correctly")
+            return
+        await update.effective_message.reply_text("ERROR Something went wrong")
+
+    async def delete_monkey(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        chat_id = update.effective_message.chat_id
+        if not context.args:
+            await update.effective_message.reply_text("ERROR You need to provide a valid login")
+            return
+
+        self.location.cursor.execute("SELECT id FROM users WHERE chat_id=?", (chat_id,))
+        id = self.location.cursor.fetchone()
+        if not id or not id[0]:
+            await update.effective_message.reply_text("ERROR You don't have a friends list")
+        for user in context.args:
+            self.location.cursor.execute("SELECT login FROM friends WHERE owner_id=? AND login=?", (id[0], user))
+            rmuser = self.location.cursor.fetchone()
+            if not rmuser:
+                await update.effective_message.reply_text("ERROR You need to provide a valid login")
+                return
+            self.location.cursor.executemany("DELETE FROM friends WHERE owner_id=? AND login=?", [(id[0], user,)])
+        conn.commit()
+        await update.effective_message.reply_text("User deleted correctly")
+
 
     async def alarm(self, context: ContextTypes.DEFAULT_TYPE) -> None:
         job = context.job
@@ -99,7 +155,6 @@ class Bot:
 
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-
         chat_id = update.effective_message.chat_id
         if not chat_id:
             return
@@ -137,7 +192,7 @@ class Bot:
         except (IndexError, AttributeError, KeyError):
             await update.effective_message.reply_text("ERROR\nSorry, you have nothing to stop")
 
-    async def stop_all(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None: 
+    async def stop_all(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         self.timer = {}
         await context.job_queue.stop()
 
@@ -147,17 +202,36 @@ class Bot:
 
 
 
-bot = Bot()
-
 load_dotenv()
 
-
+bot = Bot()
 key = getenv("BOT_TOKEN")
+
+
 app = ApplicationBuilder().token(key).build()
+
+#
+#---------- HELP PANEL HANDLER ------------------
+#
+app.add_handler(CommandHandler(["h", "help"], bot.help_panel))
+#
+#---------- LOGIN HANDLERS ----------------------
+#
 app.add_handler(CommandHandler(["start", "s"], bot.start))
 app.add_handler(CommandHandler(["timerstatus", "ts"], bot.status))
 app.add_handler(CommandHandler(["stop", "o"], bot.stop))
 app.add_handler(CommandHandler("kill", bot.stop_all))
+
+
+
+#
+#---------- WHERE ARE THE MONKEYS HANDLERS ------
+#
+app.add_handler(CommandHandler(["addmonkey", "a"], bot.add_monkey))
+app.add_handler(CommandHandler(["deletemonkey", "d"], bot.delete_monkey))
+app.add_handler(CommandHandler(["wherearethemonkeys", "w"], bot.wherearethemonkeys))
+app.add_handler(CommandHandler(["list", "ls"], bot.list_show))
+#app.add_error_handler()
 
 app.run_polling()
 
